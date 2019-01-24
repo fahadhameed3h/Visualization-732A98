@@ -1,0 +1,232 @@
+---
+title: "Lab-3_Group-19"
+output: html_document
+#author: "fahha780","vinbe289"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+ 
+## Assignment 1 
+
+### 1
+
+```{r, warning=FALSE}
+library(ggplot2)
+library(plotly)
+library(maps)
+library(dplyr)
+
+mosquito <- read.csv("aegypti_albopictus.csv")
+mosquito_df <- as.data.frame(mosquito)
+ 
+# MailBox Token 
+Sys.setenv('MAPBOX_TOKEN' = 'pk.eyJ1IjoiZmFoaGE3ODAiLCJhIjoiY2ptOXFuM2Y1NGd4aTNwcXVoZmN2a2NzMiJ9.5VOs9LfMU_jeSj6taxZ_IA')
+
+mosquito_2004 <- mosquito[which(mosquito$YEAR == 2004),]   
+mosquito_2013 <- mosquito[which(mosquito$YEAR == 2013),]   
+
+mosquito_plot_2004 <- mosquito_2004 %>%
+  plot_mapbox(lat = ~Y, lon = ~X, color = ~factor(VECTOR),
+              mode = 'scattermapbox')  
+ 
+mosquito_plot_2013 <- mosquito_2013 %>%
+  plot_mapbox(lat = ~Y, lon = ~X, color = ~factor(VECTOR),
+              mode = 'scattermapbox')
+ 
+subplot(mosquito_plot_2004, mosquito_plot_2013, nrows = 2)
+```
+Year 2004
+South America continent seems to have more amount of Aedes aegypti type of mosquitoes than any other continent. Brazil has the most amount of it and it is concentrated along the costline. USA has more amount of Aedes albopictus than any other country.
+Year 2013
+The highest density of Aedes aegypti is in Brazil while the highest density of Aedes albopictus is in Taiwan. 
+There is a decrese in Aedes aegypti all over the world from the year 2004 to 2013 whereas there is an increse in the population of Aedes albopictus.
+
+### 2
+
+```{r, warning=FALSE}
+Z <- mosquito %>%
+   count(mosquito$COUNTRY)
+
+Z_df <- as.data.frame(Z)
+
+col_Names <- c("Country","Count")
+colnames(Z_df) <- col_Names
+
+g <- list(
+  projection = list(type = 'Equirectangular')
+)
+p <- plot_geo(Z_df) %>%
+  add_trace(
+    z = ~Count ,color=~Count, type="choropleth", colors = 'Blues',
+    locations = ~Country,locationmode ='country names'
+  ) %>%
+  layout(
+    geo = g
+  )
+p
+```
+We think that there is little information available from the graph since it shows only the
+total population of mosquitoes but not the population of mosquitoes of individual types.
+
+### 3
+
+```{r, warning=FALSE}
+g <- list(
+  projection = list(type = 'azimuthal equidistant')
+)
+p2 <- plot_geo(Z_df) %>%
+  add_trace(
+    z = ~Count ,color=~log(Count), type="choropleth", colors = 'Blues',
+    locations = ~Country,locationmode ='country names'
+  ) %>%
+  layout(
+    geo = g
+  )
+p2
+ 
+```
+ 
+```{r, warning=FALSE} 
+g <- list(
+  projection = list(type = 'conic equal area')
+)
+p3 <- plot_geo(Z_df) %>%
+  add_trace(
+    z = ~Count ,color=~log(Count), type="choropleth", colors = 'Blues',
+    locations = ~Country,locationmode ='country names'
+  ) %>%
+  layout(
+    geo = g
+  )
+p3
+```
+Eqidistant projection:
+The country size shrinks to true size when bought to the centre which gives the actual idea about the plot, but the mosquito population cannot be cannot be compared realtive to any other country since the shape and size of other countries are distorted.
+Conic equal area projection: 
+The actual shape of countries towars the south pole is distorted while the counties towards the north pole has the actual size and shape, so comparing the mosquito population relatively is not feasible.
+
+### 4
+
+```{r, warning=FALSE}
+mosquito_2013 <- mosquito[which(mosquito$YEAR == 2013),]  
+mosquito_2013_Brazil <- mosquito[which(mosquito$COUNTRY == "Brazil"),]  
+
+### a
+mosquito_2013_Brazil$X1 <- cut_interval(mosquito_2013_Brazil$X, 100)
+### b
+mosquito_2013_Brazil$Y1 <- cut_interval(mosquito_2013_Brazil$Y, 100)
+
+### c
+meanCal <- mosquito_2013_Brazil %>%
+  group_by(X1,Y1) %>%
+  summarise(meanX = mean(X), meanY = mean(Y), Observations = n()) 
+
+### d
+BrazilPlot <- plot_mapbox(data= meanCal,x= ~meanX, y= ~meanY, color = ~log(Observations) ,mode= "scattermapbox")
+BrazilPlot
+```
+
+We can see from the map that in Brazil most of the parts are affected, by concentrating on specific area using cut interval it is more easy to analyze. Areas like Rio de Janerio, Volta Redonda are most affected areas and after these some parts of Recife are also affected more than any other place, Whereas we are not able to clearly see other parts because they have two colors of dark and light blue. 
+
+## Assignment 2
+
+### 1
+
+```{r, warning=FALSE}
+data <- read.csv("SwedData.csv")
+
+levels(data$age) <- c("Young","Adult" ,"Senior")
+
+data <- data[order(data$age),]
+data1 <- filter(data , age == "Senior")
+data2 <-  filter(data , age == "Adult")
+data3 <-  filter(data , age == "Young")
+
+transform_Data <- cbind(data1,data2,data3)
+
+transform_Data <- transform_Data[,-4] 
+transform_Data <- transform_Data[,-6]
+
+transform_Data <- transform_Data[,c(-2,-4,-6)]
+
+colnames(transform_Data) <- c("Region","Senior","Adult","Young") 
+
+columnsplit <- strsplit(levels(transform_Data$Region)," ")
+levels(transform_Data$Region) <- sapply(columnsplit,function(x) x[[2]])
+```
+
+### 2
+
+```{r, warning=FALSE}
+Salary <- data$X2016
+Age <- data$age
+
+mean_plot <- ggplot(data, aes(y=as.numeric(Salary), x=factor(Age), fill = Age)) + 
+  xlab("Age") + ylab("Income")+
+  geom_violin() 
+
+mean_plot <- mean_plot + stat_summary(fun.y=mean, geom="point", size=2, color="red")
+mean_plot 
+```
+According to the plot the mean income of young is the lowest and for the senior it is the highest. The income for young people lies around the mean whereas for adult the salary varies a lot from the mean and for seniors majority of the people's income seem to lie below the mean income. 
+
+### 3
+
+```{r, warning=FALSE} 
+library(plotly)
+library(akima)
+
+intpolt <- interp(x=transform_Data$Adult,y=transform_Data$Young,z=transform_Data$Senior, duplicate = "mean")
+plot_ly(x=~intpolt$x, y=~intpolt$y, z=~intpolt$z, type = "surface") %>%
+  layout(
+    title = "Income Dependence of Seniors on Adult and Young Incomes",
+    scene = list(
+      xaxis = list(title = "Adult"),
+      yaxis = list(title = "Young"),
+      zaxis = list(title = "Senior")
+    )) 
+```
+All the three age groups follow the same trend and are linearly dependent on each other following linear path. Linear regression would be suitable to model this dependence. It is quite difficult to analyze all the three factors at once.
+
+### 4
+
+```{r, warning=FALSE}  
+rds <- readRDS("gadm36_SWE_1_sf.RDS")
+
+rownames(transform_Data) = transform_Data$Region
+ 
+rds$Young = transform_Data[rds$NAME_1,"Young"]
+rds$Young[is.na(rds$Young)] = 0
+
+ch_plot1 <- rds %>% plot_ly() %>% 
+    add_sf(split=~NAME_1,color=~Young, showlegend=F, alpha=1) #%>%
+ch_plot1
+
+
+rds$Adult = transform_Data[rds$NAME_1,"Adult"]
+rds$Adult[is.na(rds$Adult)] = 0
+
+ch_plot2 <- rds %>% plot_ly() %>% 
+    add_sf(split=~NAME_1,color=~Adult, showlegend=F, alpha=1) #%>%
+ch_plot2
+
+```
+The income for Adult is found to be more all over the country than that compared to that of young, by looking at the scale. The income for young seem to vary in different places all over Sweden while for adult it remains fairly the same for most part of the country. Both Young and adult and earn highest and the lowest income in the same areas i.e Stockholm and vastra Gotaland respectively.  
+
+### 5
+
+```{r, warning=FALSE}
+Linkoping_ch_plot <- rds %>% plot_ly() %>% 
+    add_sf(split=~NAME_1,color=~Young, showlegend=F, alpha=1) %>%
+    add_markers(y=~58.409814,x=~15.624525,hoverinfo="text",text="Linköping",
+                marker=list(color="#f40000" , size=10)) 
+                 
+Linkoping_ch_plot
+```
+
+In the Last part we placed a red mark at Linkoping with vertices y=58.409814,x=15.624525.
+Which tells us where we are.
+
+

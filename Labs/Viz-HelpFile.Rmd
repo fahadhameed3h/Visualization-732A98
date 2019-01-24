@@ -1,0 +1,431 @@
+---
+title: "Visualization-HelpFile"
+author: "fahad"
+date: "December 6, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Labs
+
+## Lab 1
+  
+### Assignment 2
+
+#### 1
+
+Read data from SENIC.txt into R.
+
+```{r eval=FALSE}
+senic <- read.table(file="SENIC.txt")
+```
+ 
+#### 2
+Create a function that for a given column (vector) X does the following:
+a. It computes first and third quantiles Q1 and Q3 with quantiles()
+b. It returns indices of outlying observations, i.e. observation with X-values greater than Q3+1.5(Q3-Q1) or less than Q1+1.5(Q3-Q1).
+```{r eval=FALSE}
+col_Names <- c("ID", "Length of Stay", "Age", "Infection risk",
+               "Routine Culturing Ratio", "Routine Chest X-ray Ratio", "Number of Beds",
+               "Medical School Affiliation", "Region","Average Daily Census",
+               "Number of Nurses", "Available Facilities & Services")
+
+colnames(senic) <- col_Names
+
+fun_quantile <- function(X){
+  Q1 <- unname(quantile(X, 0.25))
+  Q3 <- unname(quantile(X, 0.75))
+  greater <- Q3 + 1.5*(Q3 - Q1)
+  less <- Q1 - 1.5*(Q3 - Q1) 
+  index <- senic[(which(X > greater | X < less)),]$ID
+  return(index)
+}
+```
+
+
+#### 3
+Use ggplot2 and the function from step 2 to create a density plot of Infection risk in which outliers are plotted as a diamond symbol ( ??? ) . Make some analysis of this graph.
+```{r eval=FALSE}
+library(ggplot2)
+
+Inf_risk <- fun_quantile(senic$`Infection risk`)
+value_Inf <- senic[Inf_risk,]$`Infection risk`
+# 7.7 1.3 7.6 7.8 1.3 1.4
+df_Infrisk <- as.data.frame(value_Inf)
+
+Plot_1 <- ggplot() +
+  geom_density(data = senic,aes(x=senic$`Infection risk`), size=1) +
+  labs(x="Infection risk", y="Density") +
+  geom_point(data = df_Infrisk, aes(x=value_Inf,y = 0, pch=3),size=3,shape=23,colour="red",fill="blue")
+Plot_1
+```
+
+In the density graph of Infection risk the six outliers are plotted on the X-axis as diamond symbols. 
+Outliers: 7.7   1.3   7.6   7.8   1.3   1.4
+Majority of the values seem to lie in the region between 4 and 5.
+
+#### 4
+Produce graphs of the same kind as in step 3 but for all other quantitative variables in the data (aes_string() can be useful here). Put these graphs into one (hint: arrangeGrob() in gridExtra package can be used) and make some analysis.
+```{r eval=FALSE}
+library(gridExtra)
+combined_plots <- lapply(c(2:7,10,11), function(i){
+  ggplot() +
+    geom_density(aes(senic[,i])) +
+    geom_point(aes(x = senic[fun_quantile(senic[,i]),i], y = 0), shape = 23, col = "red", fill = "red") +
+    labs(x = col_Names[i])
+})
+
+Plot_Final <- arrangeGrob(grobs = combined_plots, nrow=2)
+plot(Plot_Final)
+```
+
+The density plots for all quantitative variables are plotted in a similar manner. The outliers are again plotted on the X-axis in Diamond symbols.
+The outliers for Density graph of Length of stay, Routine cultring ratio, Routine chest x-ray ratio, Number of beds, Average daiy census and Number of nurses seem to lie only in the right portion of the graph.
+The outliers for Density graph of Infection risk, Age, seem to lie on either sides of the graph.
+There are no outliers in the variable Available Facilities and services.
+The Density graph for Length of stay, Routine Culturing ratio, Number of beds, Average daily census, Number of nurses is right scewed.
+
+#### 5
+Create a ggplot2 scatter plot showing the dependence of Infection risk on the Number of Nurses where the points are colored by Number of Beds. Is there any interesting information in this plot that was not visible in the plots in step 4? What do you think is a possible danger of having such a color scale?
+```{r eval=FALSE}
+ggplot(data = senic, aes(x = senic$`Number of Nurses`, y = senic$`Infection risk`,
+                         color = senic$`Number of Beds`))+
+  labs(x="Number of Nurses", y="Infection risk", colour="Number of Beds")+
+  geom_point()+
+  theme_light()
+```
+As the plot includes 3 variables Infection risk, Number of nurses and Number of beds we can see the dependence of these variables on each other which was not available in the density graph for each of these variables.
+The Infection risk seem to increase with the increase in the number of beds while the Number of Nurses stay almost constant.But when there is an increase in the Number of nurses along with the increase in Numer of beds the Infection risk reduces signifcantly. The Infetion risk is lowestwhen both Number of beds and nurses is low.
+Danger- The minute difference in colour saturation cannot be easily distinguished. If any ouliers exist, they cannot be differentiated easily compared to when distinct colours are used. 
+
+#### 6  
+Convert graph from step 3 to Plotly with ggplotly function. What important new functionality have you obtained compared to the graph from step 3? Make some additional analysis of the new graph.
+```{r eval=FALSE}
+library(plotly)
+library(later)
+ggplotly(Plot_1)
+```
+We get an interactive graph wherein the cursor can be hovered on the plot to get info such as the x-axis and y-axis variable values at any particular point on the plot. The value of outliers can easily be found out by just hovering the cursor on the outliers. The approximate value of mean can be checked instantly.
+ 
+#### 7
+Use data plot-pipeline and the pipeline operator to make a histogram of Infection risk in which outliers are plotted as a diamond symbol (  ) . Make this plot in the Plotly directly (i.e. without using ggplot2 functionality). Hint: select(), filter() and is.element() functions might be useful here.
+```{r eval=FALSE}
+library(dplyr)
+riskIndex <- fun_quantile(senic$`Infection risk`)
+outliersRisk <- senic[riskIndex,]
+
+plt <- senic %>% select('Infection risk') %>%
+  mutate(Rank=ntile(senic$`Infection risk`,3)) %>%
+  plot_ly(x=senic$`Infection risk`, type = "histogram",
+          histnorm = "probability",
+                name = "Density of Data") %>%
+  add_markers(x = outliersRisk$'Infection risk' , y = 0,
+              marker = list(size =10 ,symbol = 23,color = "red"),
+              name = "Outliers") %>%
+  layout(title = "Histogram of Infection Risk with Outliers",
+         xaxis = list(title = "Infection Risk"), 
+         yaxis = list(title = "Density"))
+plt
+```
+
+#### 8
+Write a Shiny app that produces the same kind of plot as in step 4 but in addition include:
+a. Checkboxes indicating for which variables density plots should be produced
+b. A slider changing the bandwidth parameter in the density estimation ('bw' parameter)
+```{r eval=FALSE}
+senic <- read.table("SENIC.txt")
+
+colnames(senic) <- c("ID","STAY","AGE","RISK","CULTURE_RATIO","CHEST","BEDS","AFFILIATION","REGION","CENSUS","NURSES","FS")
+
+fun_quantile <- function(X){
+  Q1 <- unname(quantile(X, 0.25))
+  Q3 <- unname(quantile(X, 0.75))
+  greater <- Q3 + 1.5*(Q3 - Q1)
+  less <- Q1 - 1.5*(Q3 - Q1) 
+  index <- senic[(which(X > greater | X < less)),]$ID
+  return(index)
+}
+
+Select_Variables <- c("STAY","AGE","RISK","CULTURE_RATIO","CHEST","BEDS","CENSUS","NURSES","FS")
+
+ui <- fluidPage(
+  sliderInput(inputId="bw_value", label="Choose bandwidth size", value=0.1, min=0.01, max=1),
+  checkboxGroupInput("var", "Variables ", Select_Variables , inline=TRUE,selected = "STAY"),
+  plotOutput("densPlot")
+)
+
+server <- function(input, output) { 
+  output$densPlot <- renderPlot({ 
+    sele <- input$var
+    lst <- vector("list" , length = length(sele))
+    
+    for (i  in 1:length(sele)) {
+      vals <- fun_quantile(senic[,sele[i]])
+      senic2 <- senic[vals,]
+      lst[[i]] <- ggplot() + geom_density(data = senic, aes_string(x = sele[i] ), size=1,bw = input$bw_value) +
+        geom_point(data=senic2, aes_string(x = sele[i],y=0, pch=3),size=3,shape=23,colour="red",fill="blue") + 
+       scale_shape_identity()
+    }
+    final <- arrangeGrob(grobs = lst)
+    grid.arrange(final)
+  })
+}
+
+shinyApp(ui = ui, server = server) 
+```
+
+The plot seems to get cluttered at low bandwidth and we can view every point in the graph which is not the proper way to see density of a variable. When we increase the bandwidth the graph becomes more smooth and shows us general view of the variable. The chosen bandwidth is 0.01 to 1 with increase of 0.01. By analyzing the graph we found at 0.38 bandwidth the graph shows the best view of data density.
+ 
+ 
+## Lab 2
+
+### Assignment 1
+#### 1
+Create a scatterplot in Ggplot2 that shows dependence of Palmitic on Oleic in which observations are colored by Linolenic. Create also a similar scatter plot in which you divide Linolenic variable into fours classes (use cut_interval() ) and map the discretized variable to color instead. How easy/difficult is it to analyze each of these plots? What kind of perception problem is demonstrated by this experiment?
+```{r eval=FALSE}
+
+library(ggplot2)
+olive <- read.csv("olive.csv")
+
+## 1 Palmitic on Oleic
+ggplot(olive, aes(x=palmitic, y=oleic, col=linolenic)) + geom_point()  +
+  labs(x="Palmitic", y="Oleic", colour="Linolenic") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+ 
+X_cut <- cut_interval(x=olive$linolenic, n = 4)
+
+ggplot(olive, aes(x=palmitic, y=oleic, col=X_cut)) + geom_point()  +
+  labs(x="Palmitic", y="Oleic", colour="Discretized Variable") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+
+```
+
+In the first graph, it is hard to catogorize the data points for Linolenic since it is hard to differntiate between data points whose values are colse to each other.
+The second plot is relatively easier to analyze but when the data is catogorized using distinct colours the data points with lighter coulour may not be noticable when a cluster of data points with dark colour overlaps it.
+
+#### 2
+Create scatterplots of Palmitic vs Oleic in which you map the discretized Linolenic with four classes to:
+a. Color
+b. Size
+c. Orientation angle (use geom_spoke() )
+State in which plots it is more difficult to differentiate between the categories and connect your findings to perception metrics (i.e. how many bits can be decoded by a specific aesthetics)
+```{r eval=FALSE}
+
+## 2 Palmitic vs Oleic
+### a  Color
+ggplot(olive, aes(x=palmitic, y=oleic,col=X_cut)) + geom_point()  +
+  labs(x="Palmitic", y="Oleic", colour="Discretized Variable") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+
+### b  Size
+ggplot(olive, aes(x=palmitic, y=oleic)) + geom_point(size=X_cut)  +
+  labs(x="Palmitic", y="Oleic", colour="Discretized Variable") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+
+### c  Orientation Angle
+ggplot(olive, aes(x=palmitic, y=oleic)) + geom_point()  +
+  geom_spoke(aes(angle = as.numeric(X_cut)), radius = 50) +
+  labs(x="Palmitic", y="Oleic", colour="Discretized Variable") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+
+
+```
+
+Second plot is the hardest plot to analyze since only 4-5 levels can be percieved(2.2 bits) which is less compared to that of colour hue(3.1 bits) and line orientation(3 bits). Also, the data points overlap each other heavily and the data points of the third variable cannot be catogorized visually. First plot is the easiest of all to analyze since we can percieve 8 levels in colour hue(3 bits) and the hue is fairly distinct. 
+
+#### 3
+Create a scatterplot of Oleic vs Eicosenoic in which color is defined by numeric values of Region. What is wrong with such a plot? Now create a similar kind of plot in which Region is a categorical variable. How quickly can you identify decision boundaries? Does preattentive or attentive mechanism make it possible?
+```{r eval=FALSE}
+
+## 3 Oleic vs Eicosenoic
+ggplot(olive, aes(x=oleic, y=eicosenoic,col=Region)) + geom_point()  +
+  labs(x="Oleic", y="Eicosenoic", colour="Region") +
+  theme_classic() + ggtitle("Oleic VS Eicosenoic")
+
+Region_categorical <- as.factor(olive$Region)
+ggplot(olive, aes(x=oleic, y=eicosenoic,col=Region_categorical)) + geom_point()  +
+  labs(x="Oleic", y="Eicosenoic", colour="Region CV") +
+  theme_classic() + ggtitle("Oleic VS Eicosenoic")
+
+
+```
+
+In the first plot since region is a catogorical variable i.e. discrete, using this type of colouring is not advisable(differing brightness) because when there are larger number of regions it would make catogorizing regions visually with respect to region hard. This type of colouring can only be used for continuous variables.
+It is easier to catogorize visually with respect to region in the second plot due to preattentive mechanism.
+
+#### 4
+Create a scatterplot of Oleic vs Eicosenoic in which color is defined by a discretized Linoleic (3 classes), shape is defined by a discretized Palmitic (3 classes) and size is defined by a discretized Palmitoleic (3 classes). How difficult is it to differentiate between 27=3* 3 * 3 different types of observations? What kind of perception problem is demonstrated by this graph?
+```{r eval=FALSE}
+
+## 4 Oleic vs Eicosenoic
+Color_linoleic <- cut_interval(x=olive$linoleic, n = 3)
+shape_palmitic <- cut_interval(x=olive$palmitic, n = 3)
+size_palmitoleic <- cut_interval(x=olive$palmitoleic, n = 3)
+
+ggplot(olive, aes(x=oleic, y=eicosenoic,col=Color_linoleic)) +
+  geom_point(shape = shape_palmitic,size=size_palmitoleic)  +
+  labs(x="Oleic", y="Eicosenoic", colour="Color_linoleic") +
+  theme_classic() + ggtitle("Oleic VS Eicosenoic")
+
+```
+
+It is quite difficult to analize this type of plot since many variables are plotted using different metrics. It is also difficult to analyze since visual analysis does not become any easier  by combining different metrics, in this case 3*3 i.e. 27 and preattentive mechanism does not make sense. The channel capacities does not sum up in this case.
+
+#### 5
+Create a scatterplot of Oleic vs Eicosenoic in which color is defined by Region, shape is defined by a discretized Palmitic (3 classes) and size is defined by a discretized Palmitoleic (3 classes). Why is it possible to clearly see a decision boundary between Regions despite many aesthetics are used? Explain this phenomenon from the perspective of Treisman's theory.
+```{r eval=FALSE}
+ 
+ggplot(olive, aes(x=oleic, y=eicosenoic,col=Region)) +
+  geom_point(shape = shape_palmitic,size=size_palmitoleic)  +
+  labs(x="Oleic", y="Eicosenoic", colour="Classes") +
+  theme_classic() + ggtitle("Oleic VS Eicosenoic")
+
+```
+
+It is possible to clearly see a decision boundary between Regions despite using many aesthetics because only 3 regions exist and the colours are distinct due to this. The peattentive mechanism comes into picture as well. This figure is processed in parallel by checking colour, shape (and size to a little extent) individually which acts as individual feature maps. Specific preattentive task is performed on each of these feature maps which aids in quicker and easier visual analysis.
+
+#### 6
+Use Plotly to create a pie chart that shows the proportions of oils coming from different Areas. Hide labels in this plot and keep only hover-on labels. Which problem is demonstrated by this graph?
+```{r eval=FALSE}
+## 6
+library(dplyr)
+library(plotly)
+PP<- plot_ly(olive, labels = ~Area, values = ~oleic, type = 'pie') %>%
+                          layout(showlegend = FALSE)
+PP
+```
+
+Since lables are removed, the name of a particular area will only be visible when the cursor is hovered on that particular area on the pie chart and other area names will not be visible. 
+
+#### 7
+Create a 2d-density contour plot with Ggplot2 in which you show dependence of Linoleic vs Eicosenoic. Compare the graph to the scatterplot using the same variables and comment why this contour plot can be misleading.
+
+```{r eval=FALSE}
+ggplot(olive, aes(x=linoleic, y=eicosenoic) ) +
+  geom_density_2d() +
+  labs(x="Linoleic", y="Eicosenoic") +
+  theme_classic() + ggtitle("Linoleic vs Eicosenoic Contour Plot")
+  
+ggplot(olive, aes(x=linoleic, y=eicosenoic)) +
+  geom_point()  +
+  labs(x="Linoleic", y="Eicosenoic", colour="Classes") +
+  theme_classic() + ggtitle("Linoleic vs Eicosenoic Scatter Plot")
+
+```
+
+This contour plot can be misleading since the data points are not discrete or distinct. In addition the colour scale does not make the visual analysis any easier.
+
+### Assignment 2
+
+#### 1
+Load the file to R and answer whether it is reasonable to scale these data in order to perform a multidimensional scaling (MDS).
+
+```{r message=FALSE, warning=FALSE,  eval=FALSE}
+library(xlsx)
+library(MASS)
+library(plotly)
+library(ggpubr)
+
+## 1
+baseball <- read.xlsx("baseball-2016.xlsx", sheetIndex = 1)
+baseball.df <- as.data.frame(baseball)
+
+baseball.numeric <- scale(baseball[,sapply(baseball,is.numeric)])
+dist_baseball <- dist(baseball.numeric,"minkowski")
+
+```
+
+The numeric variables in the dataset baseball have different scales. When we analyze 
+the numeric data in terms of their mean and variance they differ too much so it
+is necessary to scale the numeric varibles to perform Multi dimensional scalling to get proper plot.
+
+#### 2
+Write an R code that performs a non-metric MDS with Minkowski distance=2 of the data (numerical columns) into two dimensions. Visualize the resulting observations in Plotly as a scatter plot in which observations are colored by League. Does it seem to exist a difference between the leagues according to the plot? Which of the MDS components seem to provide the best differentiation between the Leagues? Which baseball teams seem to be outliers?
+```{r eval=FALSE}
+## 2 Non MDS
+BB_val <- isoMDS(dist_baseball, k=2, p=2)
+BB_val_df <- data.frame(BB_val)
+coords <- BB_val$points
+
+NOMSD_plot <- ggplot(BB_val_df, aes(x=BB_val$points[,1], y=BB_val$points[,2])) + geom_point(aes(colour = baseball$League)) 
+ggplotly(NOMSD_plot)
+
+X <- BB_val$points[,1]
+Y <- BB_val$points[,2]
+
+plot_ly(type = "scatter",data = BB_val_df,x=~X, y=~Y ,text=baseball$Team,
+        mode = "markers",color = ~baseball$League)
+
+```
+
+The AL league is more concentrated in the center whereas NL is more scattered away from the axis.
+The Y component seems to provide best differentiation between leagues as it can be seen from the graph that more NL points lie on negative Y than AL points.BOSTON RED SOX and ATLANTA BRAVES seems to be the outliers.
+
+#### 3
+Use Plotly to create a Shepard plot for the MDS performed and comment about how successful the MDS was. Which observation pairs were hard for the MDS to map successfully?
+```{r eval=FALSE }
+sh <- Shepard(dist_baseball, coords)
+delta <-as.numeric(dist_baseball)
+D <- as.numeric(dist(coords))
+
+n = nrow(coords)
+index = matrix(1:n, nrow=n, ncol=n)
+index1 = as.numeric(index[lower.tri(index)])
+
+n = nrow(coords)
+index = matrix(1:n, nrow=n, ncol=n, byrow = TRUE)
+index2 = as.numeric(index[lower.tri(index)])
+
+row.names(baseball) <- baseball[,1]
+
+sh_p <- plot_ly()%>%
+  add_markers(x=~delta, y=~D, hoverinfo = 'text',
+              text = ~paste('Obj1: ', rownames(baseball)[index1],
+                            '<br> Obj 2: ', rownames(baseball)[index2]))%>%
+  add_lines(x=~sh$x, y=~sh$yf)
+sh_p
+```
+
+
+We think that it is a decent fit, plot converges with slight fluctuations there is a monotonic increase in the values but there lies some values that are away from others. Observation pairs Minnesota Twins vs Arizona Diamondbacks, Oakland Athletics VS Milwaukee Brewers were hard for MDS to map successfully.
+
+#### 4
+Produce series of scatterplots in which you plot the MDS variable that was the best in the differentiation between the leagues in step 2 against all other numerical variables of the data. Pick up two scatterplots that seem to show the strongest (positive or negative) connection between the variables and include them into your report. Find some information about these variables in Google - do they appear to be important in scoring the baseball teams? Provide some interpretation for the chosen MDS variable.
+```{r eval=FALSE }
+sp_data <- cbind(baseball.numeric, coords[,2])
+colnames(sp_data)[27] <- "MDScomp"
+sp_data <- as.data.frame(sp_data)
+
+varMDS_Fun <- function(given_col){
+  ggplot(data=sp_data, aes(x=MDScomp, y=sp_data[,given_col])) + geom_point() +
+    labs(y=colnames(sp_data)[given_col], title=paste(colnames(sp_data)[given_col]))
+}
+
+varMDS_Fun(9)
+varMDS_Fun(10)
+```
+
+Home Run variable showed the strongest positive connection with MDS component Y and the Triples variable showed the strongest negetive connection with MDS component. By searching google we came to know that both variables Home Run and Triples are very important in baseball for scoring. 
+The variable Y is highly influenced by some variables related to the process of making runs.
+
+
+
+
+### Assignment 2
+
+
+
+## Lab 3
+
+
+
+## Lab 4
+
+
+## Lab 5
+
+
+## Lab 6

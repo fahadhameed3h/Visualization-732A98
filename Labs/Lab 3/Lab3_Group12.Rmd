@@ -1,0 +1,518 @@
+---
+title: "Lab3"
+author: "Min-Chun Shih, Saewon Jun"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+***
+## Assignment 1
+***
+#### 1. Create two dot maps in years 2004 and 2013 to show the distribution of the two types of mosquitos in the world
+
+```{r , echo=FALSE, message=FALSE}
+library(plotly)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(plotly)
+library(akima)
+library(sf)
+Sys.setenv('MAPBOX_TOKEN' = 'pk.eyJ1Ijoic2hpaHMiLCJhIjoiY2ptZ3R0MTd5MDJtOTNxbzIybm1tNDl0dSJ9.tIrQ5Wjc1X0xguKlk1Jkow')
+
+df <- read.csv('aegypti_albopictus.csv', stringsAsFactors = FALSE)
+```
+
+- For 2004
+```{r, message=FALSE, fig.width=8, fig.height=6}
+df_2004 <- df[which(df$YEAR == "2004"), ]
+plot_mapbox(df_2004, x = ~X, y = ~Y, split = ~VECTOR) %>%
+  layout(title = "2 types of mosquitos in the world in 2004",
+         legend = list(orientation = 'h'), 
+         font = list(color='white'),
+         plot_bgcolor = '#191A1A', paper_bgcolor = '#191A1A',
+         mapbox = list(style = 'dark'),
+         margin = list(l = 25, r = 25,
+                       b = 30, t = 35,
+                       pad = 2))
+```
+
+- For 2013
+```{r, message=FALSE, fig.width=8, fig.height=6}
+df_2013 <- df[which(df$YEAR == "2013"), ]
+plot_mapbox(df_2013, x = ~X, y = ~Y, split = ~VECTOR) %>%
+  layout(title = "2 types of mosquitos in the world in 2013",
+         legend = list(orientation = 'h'), 
+         font = list(color='white'),
+         plot_bgcolor = '#191A1A', paper_bgcolor = '#191A1A',
+         mapbox = list(style = 'dark'),
+         margin = list(l = 25, r = 25,
+                       b = 30, t = 35,
+                       pad = 2))
+```
+
+>
+Analyze which countries and which regions in these countries had high density of each mosquito type and how the situation changed between these time points. What perception problems can be found in these plots?
+<p>
+**Ans: ** Compare to 2004, where two species of mosquitoes were distributed all over the world, in 2013, they were more concentrated in certain countries. We can say that the number of ades albopictus has decreased in 2013, but more frequent number of aedes aegypti are seen in Brazil. However, when you take a closer look on the map, you can find out that some observations are overlapped, so sometimes it is hard to tell between two types of mosquitos. Also, while the size of each country’s area on the map varies, the dots(observations) are in the same size so it can generate perception problems when determining the number of mosquitoes per area.
+
+***
+#### 2. Compute Z as the numbers of mosquitos per country detected during all study period
+```{r, fig.width=10, fig.height=8}
+year_detect <- unique(select(df, COUNTRY, COUNTRY_ID) %>%
+  group_by(COUNTRY) %>%
+    mutate(years = n()))
+year_detect <- data.frame(year_detect)
+
+
+# light grey boundaries
+l <- list(color = "#78685A", width = 0.5)
+
+# specify map projection/options
+g <- list(
+  showframe = FALSE,
+  showcoastlines = FALSE,
+  projection = list(type = 'Equirectangular')
+)
+
+plot_geo(year_detect) %>%
+  add_trace(z = ~years, color = ~years, colors = 'Blues', 
+            text = ~COUNTRY, locations = ~COUNTRY_ID, 
+            marker = list(line = l)) %>%
+  colorbar(title = 'Number of mosquitos') %>%
+  layout(geo = g, 
+         title = "The number of mosquitos detected during study period")
+```
+
+>
+Why do you think there is so little information in the map?
+<p>
+**Ans: **Due to the large scale of ranges, only countries with extremely high numbers or extremely low numbers on the map are clearly marked and it’s difficult to distinguish on other countries.
+
+***
+#### 3.a Create same kind of maps in step 2 but use equirectangular projection with choropleth color log(Z)
+```{r, fig.width=10, fig.height=8}
+year_detect$years_log <- log(year_detect$years)
+
+plot_geo(year_detect) %>%
+  add_trace(z = ~years_log, color = ~years_log, colors = 'Blues', 
+            text = ~COUNTRY, locations = ~COUNTRY_ID, 
+            marker = list(line = l)) %>%
+  colorbar(title = 'Number of mosquitos(log)') %>%
+  layout(geo = g, 
+         title = "The numbers of mosquitos detected during study period")
+```
+
+#### 3.b Conic equal area projection with choropleth color log(Z)
+```{r, fig.width=10, fig.height=8}
+g <- list(
+  showframe = FALSE,
+  showcoastlines = FALSE,
+  projection = list(type = 'conic equal area')
+)
+
+plot_geo(year_detect) %>%
+  add_trace(z = ~years_log, color = ~years_log, colors = 'Blues', 
+            text = ~COUNTRY, locations = ~COUNTRY_ID, 
+            marker = list(line = l)) %>%
+  colorbar(title = 'Number of mosquitos(log)') %>%
+  layout(geo = g, 
+         title = "The numbers of mosquitos detected during study period")
+```
+
+>
+Compare maps from 3a and 3b and comment which advantages and disadvantages you may see with both types of maps.
+<p>
+**Ans: **
+By taking the log, we were able to adjust the ranges into smaller scale. Thus, for 3a, it was more easier for us to distinguish the difference of observations between countries.  For 3b, when using conic equal area projection, we were able to compare the size of country more accurately, but the shape are distorted so it was hard to tell which area belongs to which country.
+
+***
+####4.Identify regions in Brazil that are most infected by mosquitoes
+```{r, message = FALSE}
+#In order to resolve problems detected in step 1, use data from 2013 only for Brazil
+XX<-subset(df,YEAR==2013 & COUNTRY=="Brazil")
+#Create variable X1 by cutting X into 100 piecies
+brazil <- df[which(df$YEAR == "2013" & df$COUNTRY == "Brazil"), ]
+brazil$X1 <- cut_interval(brazil$X, 100, labels = FALSE)
+brazil$Y1 <- cut_interval(brazil$Y, 100, labels = FALSE)
+
+brazil <- brazil %>%
+        select(X1, Y1, X, Y) %>%
+        group_by(X1, Y1) %>%
+        summarize(mean_X = mean(X), mean_Y = mean(Y), amount = n())
+
+
+plot_mapbox(brazil, x = ~mean_X, y = ~mean_Y, color = ~amount) %>%
+        layout(title = "",
+               legend = list(orientation = 'h'), 
+               font = list(color='white'),
+               plot_bgcolor = '#191A1A', paper_bgcolor = '#191A1A',
+               mapbox = list(style = 'dark'),
+               margin = list(l = 25, r = 25,
+                             b = 30, t = 35,
+                             pad = 2))
+```
+
+>
+Did such discretization help in analyzing the distribution of mosquitoes?
+<p>
+**Ans: ** Alagoas(Maceioó),Sergipu(Aracaju) Pernambugo, and Paraiíba(Campina Grande),Rio Grande Do Norte(Natal)
+seems highly infected by mosquitos. It is easier to analyze the distrivbution of mosquitoes since we are using mean value, which can summarize the data in more efficient way.
+
+***
+## Assignment 2
+***
+#### 1. Group different ages
+```{r}
+# show Swedish alphabet
+income <- read.csv("income.csv", encoding="latin1", stringsAsFactors = FALSE)
+names(income) [3] <- "income"
+income$age_group <- "Senior"
+income[which(income$age == "18-29 years"), "age_group"] <- "Young"
+income[which(income$age == "30-49 years"), "age_group"] <- "Adult"
+income$age_group <- factor(income$age_group, levels = c("Young", "Adult", "Senior"))
+
+head(income)
+```
+
+***
+#### 2. Violin plots: mean income distributions per age group
+```{r}
+ggplot(income, aes(age_group, income)) + 
+  geom_violin(aes(fill = age_group)) +
+  scale_fill_brewer(palette="Blues") + 
+  geom_boxplot(width=0.1) + 
+  labs(title = "Mean income distributions per age group", x = "Age group", y = "Income") +
+  theme_bw() +
+  theme(plot.margin = margin(1.3, 1.3, 1.1, 1.3, "cm"), # graph margin
+        axis.title.x = element_text(margin = unit(c(5, 0, 0, 0), "mm")), # x title margin
+        axis.title.y = element_text(margin = unit(c(0, 5, 0, 0), "mm")), # y title margin
+        axis.title = element_text(size = rel(1.3), face = "bold"), # axis title size
+        axis.text = element_text(size = rel(1.1)),  # axis labels size
+        plot.title = element_text(size = rel(1.6), face = "bold", 
+                                  hjust = 0.5, margin = unit(c(0, 0, 8, 0), "mm")), 
+        legend.position="none") 
+```
+
+>Analyze this plot and interpret your analysis in terms of income.
+<p>
+**Ans: **
+We can see that the level of income for ‘Adult’ and ‘Senior’ is apparently higher than the  ‘Young’ , which is very obvious. When you take a look at the shape of each age group, you can see it’s more flat for the ‘Young’ group, and become less flat for higher age group. So we can say that the higher the age, the greater the wage gap they have within the group.
+
+***
+#### 3. surface plot:dependence of Senior incomes on Adult and Young incomes
+```{r}
+# tibble class
+td_income <- tbl_df(income)
+td_income$age <- NULL
+
+# transform data as region group
+td_income <- td_income %>%
+  spread(age_group, income)
+
+
+attach(td_income)
+s <- interp(Young, Adult, Senior, duplicate = "mean")
+detach(td_income)
+plot_ly(x=~s$x, y=~s$y, z=~s$z, type="surface") %>%
+  layout(title = "Dependence of Senior incomes on Adult and Young incomes",
+         scene = list(xaxis = list(title = "Young"), 
+                      yaxis = list(title = "Adult"), 
+                      zaxis = list(title = "Senior"))) 
+```
+
+>
+What kind of trend can you see and how can this be interpreted? Do you think that linear regression would be suitable to model this dependence?
+<p>
+**Ans: **When you drag the plot, you can see and compare the trend for two variables. Senior vs Young, Senior vs Adult, Adult vs Young. We can see that the observations can be explained with linear expression, so we can say that it is reasonable to fit each of  two variables into linear regression model.
+
+
+```{r, warning = FALSE, , message = FALSE}
+ggplot(td_income, aes(x = Young, y = Senior)) +
+  geom_point() + 
+  geom_smooth(mothod = "loess")
+
+ggplot(td_income, aes(x = Adult, y = Senior)) +
+  geom_point() + 
+  geom_smooth(mothod = "loess")
+```
+
+***
+#### 4. visualize incomes of Young and Adults in two choropleth maps
+```{r, message = FALSE}
+library(sf)
+map <-readRDS("gadm36_SWE_1_sf.rds")
+
+young <- income[which(income$age_group == "Young"), ]
+young$NAME_1 <- substr(young$region, 3, nchar(young$region)-7)
+young <- young[order(young$NAME_1), ]
+map$income <- young$income
+plot_ly(map) %>% 
+  add_sf(split=~NAME_1, color=~income, 
+         showlegend = FALSE, alpha = 1, # stroke = I("white"),
+         text = ~paste0(NAME_1, ": ", income, "k SEK"), hoverinfo = "text", hoveron = "fill") %>%
+  colorbar(title = "Income\n(SEK thousands)") %>%
+  layout(title = "Incomes of Young Group")
+
+
+adult <- income[which(income$age_group == "Adult"), ]
+adult$NAME_1 <- substr(adult$region, 3, nchar(adult$region)-7)
+adult <- adult[order(adult$NAME_1), ]
+map$income <- adult$income
+plot_ly(map) %>% 
+  add_sf(split=~NAME_1, color=~income, 
+         showlegend = FALSE, alpha = 1,
+         text = ~paste0(NAME_1, ": ", income, "k SEK"), hoverinfo = "text", hoveron = "fill") %>%
+  colorbar(title = "Income\n(SEK thousands)") %>%
+  layout(title = "Incomes of Adult Group")
+```
+
+> Analyze these maps and make conclusions. Is there any new information that you could not discover in previous statistical plots?
+<p>
+**Ans: **
+Compare to previous statistical plots, we were able to get the extra information on regional income distribution. Incomes of adult group and incomes of young group shows similar distribution where Stockholm shows the higher income. However, we need to consider that the legend - scale of income between two group. 
+
+
+***
+#### 5. Show Linköping on the map
+```{r, message = FALSE, warning = FALSE}
+map$income <- young$income
+plot_ly(map) %>% 
+  add_sf(split=~NAME_1, color=~income, showlegend = F, alpha = 1,
+         text = ~paste0(NAME_1, ": ", income, "k SEK"), hoverinfo = "text", hoveron = "fill") %>%
+  add_markers(y = 58.409814, x = 15.624525, color = "red") %>%
+  add_text(y = 58, x = 16.2, text = 'Linköping', showlegend = F, color = "red") %>%
+  colorbar(title = "Income\n(SEK thousands)") %>%
+  layout(title = "Incomes of Young Group")
+```
+
+
+
+
+
+
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+library(plotly)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(plotly)
+library(akima)
+library(sf)
+Sys.setenv('MAPBOX_TOKEN' = 'pk.eyJ1Ijoic2hpaHMiLCJhIjoiY2ptZ3R0MTd5MDJtOTNxbzIybm1tNDl0dSJ9.tIrQ5Wjc1X0xguKlk1Jkow')
+
+df <- read.csv('aegypti_albopictus.csv', stringsAsFactors = FALSE)
+
+
+# For 2004
+df_2004 <- df[which(df$YEAR == "2004"), ]
+plot_mapbox(df_2004, x = ~X, y = ~Y, split = ~VECTOR) %>%
+  layout(title = "2 types of mosquitos in the world in 2004",
+         legend = list(orientation = 'h'), 
+         font = list(color='white'),
+         plot_bgcolor = '#191A1A', paper_bgcolor = '#191A1A',
+         mapbox = list(style = 'dark'),
+         margin = list(l = 25, r = 25,
+                       b = 30, t = 35,
+                       pad = 2))
+
+
+# For 2013
+df_2013 <- df[which(df$YEAR == "2013"), ]
+plot_mapbox(df_2013, x = ~X, y = ~Y, split = ~VECTOR) %>%
+  layout(title = "2 types of mosquitos in the world in 2013",
+         legend = list(orientation = 'h'), 
+         font = list(color='white'),
+         plot_bgcolor = '#191A1A', paper_bgcolor = '#191A1A',
+         mapbox = list(style = 'dark'),
+         margin = list(l = 25, r = 25,
+                       b = 30, t = 35,
+                       pad = 2))
+
+## 2. Compute Z as the numbers of mosquitos per country detected during all study period
+
+year_detect <- unique(select(df, COUNTRY, COUNTRY_ID) %>%
+  group_by(COUNTRY) %>%
+    mutate(years = n()))
+year_detect <- data.frame(year_detect)
+
+
+# light grey boundaries
+l <- list(color = "#78685A", width = 0.5)
+
+# specify map projection/options
+g <- list(
+  showframe = FALSE,
+  showcoastlines = FALSE,
+  projection = list(type = 'Equirectangular')
+)
+
+plot_geo(year_detect) %>%
+  add_trace(z = ~years, color = ~years, colors = 'Blues', 
+            text = ~COUNTRY, locations = ~COUNTRY_ID, 
+            marker = list(line = l)) %>%
+  colorbar(title = 'Number of mosquitos') %>%
+  layout(geo = g, 
+         title = "The number of mosquitos detected during study period")
+
+
+
+## 3.a Create same kind of maps in step 2 but use equirectangular projection with choropleth color log(Z)
+year_detect$years_log <- log(year_detect$years)
+
+plot_geo(year_detect) %>%
+  add_trace(z = ~years_log, color = ~years_log, colors = 'Blues', 
+            text = ~COUNTRY, locations = ~COUNTRY_ID, 
+            marker = list(line = l)) %>%
+  colorbar(title = 'Number of mosquitos(log)') %>%
+  layout(geo = g, 
+         title = "The numbers of mosquitos detected during study period")
+
+
+## 3.b Conic equal area projection with choropleth color log(Z)
+g <- list(
+  showframe = FALSE,
+  showcoastlines = FALSE,
+  projection = list(type = 'conic equal area')
+)
+
+plot_geo(year_detect) %>%
+  add_trace(z = ~years_log, color = ~years_log, colors = 'Blues', 
+            text = ~COUNTRY, locations = ~COUNTRY_ID, 
+            marker = list(line = l)) %>%
+  colorbar(title = 'Number of mosquitos(log)') %>%
+  layout(geo = g, 
+         title = "The numbers of mosquitos detected during study period")
+
+##4.Identify regions in Brazil that are most infected by mosquitoes
+
+#In order to resolve problems detected in step 1, use data from 2013 only for Brazil
+XX<-subset(df,YEAR==2013 & COUNTRY=="Brazil")
+#Create variable X1 by cutting X into 100 piecies
+brazil <- df[which(df$YEAR == "2013" & df$COUNTRY == "Brazil"), ]
+brazil$X1 <- cut_interval(brazil$X, 100, labels = FALSE)
+brazil$Y1 <- cut_interval(brazil$Y, 100, labels = FALSE)
+
+brazil <- brazil %>%
+        select(X1, Y1, X, Y) %>%
+        group_by(X1, Y1) %>%
+        summarize(mean_X = mean(X), mean_Y = mean(Y), amount = n())
+
+
+plot_mapbox(brazil, x = ~mean_X, y = ~mean_Y, color = ~amount) %>%
+        layout(title = "",
+               legend = list(orientation = 'h'), 
+               font = list(color='white'),
+               plot_bgcolor = '#191A1A', paper_bgcolor = '#191A1A',
+               mapbox = list(style = 'dark'),
+               margin = list(l = 25, r = 25,
+                             b = 30, t = 35,
+                             pad = 2))
+
+## Assignment 2
+
+#### 1. Group different ages
+
+# show Swedish alphabet
+income <- read.csv("income.csv", encoding="latin1", stringsAsFactors = FALSE)
+names(income) [3] <- "income"
+income$age_group <- "Senior"
+income[which(income$age == "18-29 years"), "age_group"] <- "Young"
+income[which(income$age == "30-49 years"), "age_group"] <- "Adult"
+income$age_group <- factor(income$age_group, levels = c("Young", "Adult", "Senior"))
+
+head(income)
+
+
+
+## 2. Violin plots: mean income distributions per age group
+ggplot(income, aes(age_group, income)) + 
+  geom_violin(aes(fill = age_group)) +
+  scale_fill_brewer(palette="Blues") + 
+  geom_boxplot(width=0.1) + 
+  labs(title = "Mean income distributions per age group", x = "Age group", y = "Income") +
+  theme_bw() +
+  theme(plot.margin = margin(1.3, 1.3, 1.1, 1.3, "cm"), # graph margin
+        axis.title.x = element_text(margin = unit(c(5, 0, 0, 0), "mm")), # x title margin
+        axis.title.y = element_text(margin = unit(c(0, 5, 0, 0), "mm")), # y title margin
+        axis.title = element_text(size = rel(1.3), face = "bold"), # axis title size
+        axis.text = element_text(size = rel(1.1)),  # axis labels size
+        plot.title = element_text(size = rel(1.6), face = "bold", 
+                                  hjust = 0.5, margin = unit(c(0, 0, 8, 0), "mm")), 
+        legend.position="none") 
+
+## 3. surface plot:dependence of Senior incomes on Adult and Young incomes
+
+# tibble class
+td_income <- tbl_df(income)
+td_income$age <- NULL
+
+# transform data as region group
+td_income <- td_income %>%
+  spread(age_group, income)
+
+
+attach(td_income)
+s <- interp(Young, Adult, Senior, duplicate = "mean")
+detach(td_income)
+plot_ly(x=~s$x, y=~s$y, z=~s$z, type="surface") %>%
+  layout(title = "Dependence of Senior incomes on Adult and Young incomes",
+         scene = list(xaxis = list(title = "Young"), 
+                      yaxis = list(title = "Adult"), 
+                      zaxis = list(title = "Senior"))) 
+
+
+
+ggplot(td_income, aes(x = Young, y = Senior)) +
+  geom_point() + 
+  geom_smooth(mothod = "loess")
+
+ggplot(td_income, aes(x = Adult, y = Senior)) +
+  geom_point() + 
+  geom_smooth(mothod = "loess")
+
+
+## 4. visualize incomes of Young and Adults in two choropleth maps
+library(sf)
+map <-readRDS("gadm36_SWE_1_sf.rds")
+
+young <- income[which(income$age_group == "Young"), ]
+young$NAME_1 <- substr(young$region, 3, nchar(young$region)-7)
+young <- young[order(young$NAME_1), ]
+map$income <- young$income
+plot_ly(map) %>% 
+  add_sf(split=~NAME_1, color=~income, 
+         showlegend = FALSE, alpha = 1, # stroke = I("white"),
+         text = ~paste0(NAME_1, ": ", income, "k SEK"), hoverinfo = "text", hoveron = "fill") %>%
+  colorbar(title = "Income\n(SEK thousands)") %>%
+  layout(title = "Incomes of Young Group")
+
+
+adult <- income[which(income$age_group == "Adult"), ]
+adult$NAME_1 <- substr(adult$region, 3, nchar(adult$region)-7)
+adult <- adult[order(adult$NAME_1), ]
+map$income <- adult$income
+plot_ly(map) %>% 
+  add_sf(split=~NAME_1, color=~income, 
+         showlegend = FALSE, alpha = 1,
+         text = ~paste0(NAME_1, ": ", income, "k SEK"), hoverinfo = "text", hoveron = "fill") %>%
+  colorbar(title = "Income\n(SEK thousands)") %>%
+  layout(title = "Incomes of Adult Group")
+
+## 5. Show Linköping on the map
+```{r, message = FALSE, warning = FALSE}
+map$income <- young$income
+plot_ly(map) %>% 
+  add_sf(split=~NAME_1, color=~income, showlegend = F, alpha = 1,
+         text = ~paste0(NAME_1, ": ", income, "k SEK"), hoverinfo = "text", hoveron = "fill") %>%
+  add_markers(y = 58.409814, x = 15.624525, color = "red") %>%
+  add_text(y = 58, x = 16.2, text = 'Linköping', showlegend = F, color = "red") %>%
+  colorbar(title = "Income\n(SEK thousands)") %>%
+  layout(title = "Incomes of Young Group")
+
+
+```
+
+

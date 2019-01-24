@@ -1,0 +1,325 @@
+---
+title: "Lab4 Group19"
+author: "fahha780, vinbe289"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Assignment 1
+
+```{r, warning=FALSE}
+### 1
+
+df_data <- as.data.frame(read.delim("prices-and-earnings.txt"))
+data <- df_data[,c(1,2,5,6,7,9,10,16,17,18,19)]
+row.names(data) <- data[,1]  
+scaleData <- scale(data[,2:11])
+
+```
+
+
+```{r}
+### 2
+library(ggplot2)
+library(plotly)
+
+plot_ly(x=colnames(scaleData), y=rownames(scaleData), 
+    z=scaleData, type="heatmap", colors = colorRamp(c("yellow","red")))
+
+```
+
+We are not able to see any clusters or outliers(clearly) here. 
+
+```{r}
+### 3
+
+library(seriation)
+
+rowdist_euc <- dist(scaleData)
+rowdist_ser_euc <- seriate(rowdist_euc, method = "OLO")
+roworder_euc <-get_order(rowdist_ser_euc)
+
+coldist_euc <- dist(t(scaleData))
+coldist_ser_euc <- seriate(coldist_euc, method = "OLO")
+colorder_euc <- get_order(coldist_ser_euc)
+
+reordered_euc <- scaleData[rev(roworder_euc),colorder_euc]
+
+rowdist_cor <- 1 - as.dist(cor(t(scaleData)))
+rowdist_ser_cor <- seriate(rowdist_cor, method = "OLO")
+roworder_cor <- get_order(rowdist_ser_cor)
+
+coldist_cor <- 1 - as.dist(cor(scaleData))
+coldist_ser_cor <- seriate(coldist_cor, method = "OLO")
+colorder_cor <- get_order(coldist_ser_cor)
+
+reordered_cor <- scaleData[rev(roworder_cor),colorder_cor]
+
+plot_3.1 <- plot_ly(x=colnames(reordered_euc), y=rownames(reordered_euc), 
+    z=reordered_euc, type="heatmap", colors = colorRamp(c("yellow","red"))) %>%
+      layout(title= "HeatMap Reordered variables using Euclidian distance")
+
+plot_3.2 <- plot_ly(x=colnames(reordered_cor), y=rownames(reordered_cor), 
+    z=reordered_cor, type="heatmap", colors = colorRamp(c("yellow","red"))) %>%
+  layout(title= "HeatMap Reordered variables using 1- correlation")
+
+plot_3.1
+plot_3.2
+```
+
+The first plot seems to be easier to analyse since Clusters and outliers can be identified easily.
+In the first plot the Y axis variables i.e. cities are reordered to optimize Hamiltonion Path Length based on Euclidian distance. We can see clusters in 'iPhone.4S.hr' variable column for first 30 cities which means the hours of work (at the average wage) needed to buy an iPhone in these cities are very close to each other. The net wage seems to be the same and the least in last 10 cities i.e. Cities from Shanghai to Caracas. We can easily see a few outliers as well such as the minimum price for a kg of bread is highest in Manila followed by Caracus and Jakarta. Paris is an oulier if the variable Hours.worked is considered. Tokyo is an outlier for the variable clothing index and Food cost seems to be the highest too. 
+
+```{r}
+### 4
+
+roworder_tsp <- get_order(seriate(rowdist_euc, method = "TSP"))
+colorder_tsp <- get_order(seriate(coldist_euc, method = "TSP"))
+reordered_tsp <- scaleData[rev(roworder_tsp),colorder_tsp]
+plot_4 <- plot_ly(x=colnames(reordered_tsp), y=rownames(reordered_tsp), 
+    z=reordered_tsp, type="heatmap", colors = colorRamp(c("yellow","red"))) %>%
+      layout(title= "HeatMap Reordered variables using Traveling Salesman Problem")
+plot_4
+
+```
+
+This heatmap produced by reordering variables to optimize Hamiltonian Path Length by using TSP as solver seems to be a better plot for analysis then heatmap produced by using HC as solver.
+By comparing the objective function values such as Hamiltonian Path Length and Gradient measure achieved by row permutations of TSP and HC solvers it can be seen that TSP was the best solver since Hamiltonian Path Length and Gradient measure was lesser than that of HC solver.
+
+```{r}
+HC <- criterion(rowdist_euc,order=seriate(rowdist_euc, method = "GW"),method = c("Gradient_raw","Path_length"))
+
+TSP <- criterion(rowdist_euc,order=seriate(rowdist_euc, method = "TSP"),method = c("Gradient_raw","Path_length"))
+```
+
+```{r}
+cat("\nHC-Solver\n")
+HC
+```
+
+```{r}
+cat("\nTSP\n")
+TSP
+```
+
+```{r}
+
+### 5
+
+library(ggplot2)
+library(plotly)
+
+p1 <- as.data.frame(data) %>%
+  plot_ly(type = 'parcoords', 
+            dimensions = list(
+              list(label = "Food.Costs...", values =~Food.Costs...),
+              list(label = "Clothing.Index", values =~Clothing.Index),
+              list(label = "iPhone.4S.hr.", values =~iPhone.4S.hr.),
+              list(label = "Hours.Worked", values =~Hours.Worked),
+              list(label = "Wage.Net", values =~Wage.Net),
+              list(label = "Vacation.Days", values =~Vacation.Days),
+              list(label = "Big.Mac.min.", values =~Big.Mac.min.),
+              list(label = "Bread.kg.in.min.", values =~Bread.kg.in.min.),
+              list(label = "Rice.kg.in.min.", values =~Rice.kg.in.min.),
+              list(label = "Goods.and.Services...", values =~Goods.and.Services...)
+          )
+  )
+p1
+```
+
+Quite a few number of outliers exist in the dataset according to the plot. When the coulumns variables were rearranged we could find clusters in Variable 
+
+1) iphone.4s.hr. around the variable value 50
+
+2) Big.mac.min around the value 20
+
+3) Bread.kg.in.min at the value around 20 to 50
+
+4) Rice.Kg.in.min around 10 to 15
+
+By arranging and analyzing the plot we colored our plot on the basic of Wage.Net which we think is the most important factor in deciding the other variables by visualizing different variables dependence on Wage.Net. We found as that as the Wage.Net is high hourly work, Rice and bread consumption is low also Big Mac and Iphone variables are low whereas Vacation, clothing index and Good and services is high. Similarly if the wage is low this effects thesse variables in the opposite way.
+
+```{r}
+p2 <- data %>%
+  mutate(data = as.integer(Wage.Net > 48.6875)) %>%
+  plot_ly(type = 'parcoords', 
+            dimensions = list(
+              list(label = "Food.Costs...", values =~Food.Costs...),
+              list(label = "Clothing.Index", values =~Clothing.Index),
+              list(label = "iPhone.4S.hr.", values =~iPhone.4S.hr.),
+              list(label = "Hours.Worked", values =~Hours.Worked),
+              list(label = "Wage.Net", values =~Wage.Net),
+              list(label = "Vacation.Days", values =~Vacation.Days),
+              list(label = "Big.Mac.min.", values =~Big.Mac.min.),
+              list(label = "Bread.kg.in.min.", values =~Bread.kg.in.min.),
+              list(label = "Rice.kg.in.min.", values =~Rice.kg.in.min.),
+              list(label = "Goods.and.Services...", values =~Goods.and.Services...)
+          ),
+            line = list(color = ~as.numeric(data))
+  )
+p2
+```
+
+
+```{r, message=FALSE, warning = FALSE}
+ 
+### 6
+#Juxtaposed
+
+#Ugly graphics
+stars(reordered_euc, key.loc=c(15,2), draw.segments=F, col.stars =rep("Yellow", nrow(data)))
+
+##ggplot2
+library(scales)
+library(magrittr)
+library(dplyr)
+library(ggplot2)
+
+ data1 <- as.data.frame(reordered_euc) %>% mutate_all(funs(rescale))
+ 
+data1$name = rownames(reordered_euc)
+data2 <- data1%>%tidyr::gather(variable, value, -name, factor_key=T)%>%arrange(name)
+p <- data2 %>%
+  ggplot(aes(x=variable, y=value, group=name)) +
+  geom_polygon(fill="blue") +
+  coord_polar() + theme_bw() + facet_wrap(~ name) +
+  theme(axis.text.x = element_text(size = 5))
+p
+
+## Plotly
+
+library(plotly)
+library(dplyr)
+library(scales)
+
+Ps=list()
+nPlot=72
+
+as.data.frame(reordered_euc) %>%
+  add_rownames( var = "group" ) %>%
+  mutate_each(funs(rescale), -group) -> reordered_euc_radar
+
+for (i in 1:nPlot){
+  Ps[[i]] <- htmltools::tags$div(
+    plot_ly(type = 'scatterpolar', 
+            r=as.numeric(reordered_euc_radar[i,-1]),
+            theta= colnames(reordered_euc_radar)[-1], 
+            fill="toself")%>%
+      layout(title=reordered_euc_radar$group[i]), style="width: 25%;")
+}
+
+h <-htmltools::tags$div(style = "display: flex; flex-wrap: wrap", Ps)
+
+htmltools::browsable(h)
+
+
+```
+
+Cluster 1- Lisbon, Sao Paulo, Rio de Janeiro follows a similar pattern i.e. in Vacation days which is high in all the three cities and even other variables follows a similar trend.
+Cluster 2- Doha, Lima, Manama has similarity in terms of variables Vacation days and Hours worked and other variables also follow a similar trend.
+Caracas seems to be an outlier since it follows a pattern followed by no other city.
+
+### 7
+
+From the perspective of simplicity and to some extent efficiency we found Heatmaps was the best tool to analyze this dataset.
+
+## Assignment 2
+
+```{r}
+
+### 1
+
+library(ggplot2)
+
+adult_data <- as.data.frame(read.csv("adult.csv"))
+names(adult_data) <- c("age", "workClass", "populationIndex", "education",
+                  "educationNum", "maritalStatus", "occupation", "relationship",
+                  "race", "sex", "capitalGain", "capitalLoss", "hoursPerWeek", "country", "incomeLevel")
+plot_2.1a <- ggplot(adult_data, aes(x= age, y= hoursPerWeek, colour= incomeLevel)) + geom_point()
+plot_2.1a
+
+plot_2.1b <- plot_2.1a + facet_grid(incomeLevel~.)
+plot_2.1b
+
+```
+
+In the first plot the data points of both the catogories i.e. lesser or equal to 50k and more than 50k overlap each other heavily and it is hard to differentiate between data points of these two categories. In the second plot which is a Trellis plot we can see the actual number of data points and where the data points are denser which was not possible in the first plot. In the Trellis plot we can observe that the data in category 'income level' more than 50k from the age 25 to 60 and hours per week 25 to 60 is as denser as that of income level lesser than or equal to 50k. This was not easily evident in the first plot.
+
+```{r}
+
+### 2
+
+plot_2.2a <- ggplot()+
+geom_density(data=adult_data, aes(x=age, group=incomeLevel, fill=incomeLevel),alpha=0.5) +
+    xlab("Age") +
+    ylab("Density")
+plot_2.2a
+
+plot_2.2b <- plot_2.2a + facet_wrap(maritalStatus~.)
+plot_2.2b
+
+```
+
+In the first plot we can see that more number of people, whose income level is lesser than or equal to 50k, are somewhere around the age of 22-25 and more number of people, whose income level is more than 50k, are somewhere around the age of 33-40.
+In the second plot which is a Trellis plot it is evident that people who never got married and age group which had the highest number of people whose income level was less than or equal to 50k was younger i.e. below the age of 25 years. For the plot containing Married-spouse-absent people,there were more amount of people between 35-50 years of age in the category who's income level was more than 50k. In all the other categories of marital status the number of people who's income level was less than or equal to and more than 50k fell under the same age group.
+
+```{r}
+
+### 3
+
+adult_fltdata <- adult_data[adult_data$capitalLoss >0,]
+
+plot_2.3a <- plot_ly(adult_fltdata, x = ~educationNum, y = ~age, z = ~capitalLoss) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'Education-num'),
+                      yaxis = list(title = 'Age'),
+                      zaxis = list(title = 'Capital-Loss')))
+plot_2.3a
+
+plot_2.3b <- ggplot()+
+    geom_density2d(data = adult_fltdata, aes(x = capitalLoss, y = educationNum))+
+    facet_wrap(cut_number(adult_fltdata$age, 6)~.)
+plot_2.3b
+
+```
+
+It is difficult to analyze the 3-D plot since all the data seems to be cluttered in the center. There also exists perception problem. The data points are pretty big in size and overlap each other heavily.
+In the second plot the capital loss seems to follow almost similar trend for all the age groups though the Capital loss for the age group 54-90 is more dispersed. For different age groups variable educationNum also seems to follow a similar trend. There seems to be two groups for educationNum variable one close to 10 and one close to 14 for all age groups.
+
+```{r}
+
+### 4
+
+plot_2.4a <- ggplot()+
+  geom_point(data = adult_fltdata, aes(x = capitalLoss, y = educationNum))+
+  facet_wrap(cut_number(adult_fltdata$age, 4)~.)
+plot_2.4a
+
+Agerange <- lattice::equal.count(adult_fltdata$age, number=4, overlap=0.10)
+L<-matrix(unlist(levels(Agerange)), ncol=2, byrow = T)
+L1<-data.frame(Lower=L[,1],Upper=L[,2], Interval=factor(1:nrow(L)))
+ggplot(L1)+geom_linerange(aes(ymin = Lower, ymax = Upper, x=Interval))
+
+index=c()
+Class=c()
+for(i in 1:nrow(L)){
+  Cl=paste("[", L1$Lower[i], ",", L1$Upper[i], "]", sep="")
+  ind=which(adult_fltdata$age>=L1$Lower[i] &adult_fltdata$age<=L1$Upper[i])
+  index=c(index,ind)
+  Class=c(Class, rep(Cl, length(ind)))
+}
+
+df<-adult_fltdata[index,]
+df$Class<-as.factor(Class)
+
+ggplot(df, aes(x=capitalLoss, y=educationNum))+
+  geom_point()+
+  facet_wrap(~Class, labeller = "label_both")
+
+```
+
+Advantages- Using Shingles creates overlap of plots with respect to age in this case. Boundary effects can be avoided by using Shingles. As we can see a few data points from the preceding plot and succeeding plot will be included in the plot to avoid boundary effect.
+Disadvantages- More data points than that compared to a plot without using shingles, seem to appear in each of the plot which is a result of overlapping of data points. 

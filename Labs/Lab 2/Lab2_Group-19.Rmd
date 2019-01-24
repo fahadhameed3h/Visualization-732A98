@@ -1,0 +1,210 @@
+---
+title: "Lab 2"
+author: "Group 19"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+
+library(ggplot2)
+olive <- read.csv("olive.csv")
+
+## 1 Palmitic on Oleic
+ggplot(olive, aes(x=palmitic, y=oleic, col=linolenic)) + geom_point()  +
+  labs(x="Palmitic", y="Oleic", colour="Linolenic") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+ 
+X_cut <- cut_interval(x=olive$linolenic, n = 4)
+
+ggplot(olive, aes(x=palmitic, y=oleic, col=X_cut)) + geom_point()  +
+  labs(x="Palmitic", y="Oleic", colour="Discretized Variable") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+
+```
+
+In the first graph, it is hard to catogorize the data points for Linolenic since it is hard to differntiate between data points whose values are colse to each other.
+The second plot is relatively easier to analyze but when the data is catogorized using distinct colours the data points with lighter coulour may not be noticable when a cluster of data points with dark colour overlaps it.
+
+```{r}
+
+## 2 Palmitic vs Oleic
+### a  Color
+ggplot(olive, aes(x=palmitic, y=oleic,col=X_cut)) + geom_point()  +
+  labs(x="Palmitic", y="Oleic", colour="Discretized Variable") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+
+### b  Size
+ggplot(olive, aes(x=palmitic, y=oleic)) + geom_point(size=X_cut)  +
+  labs(x="Palmitic", y="Oleic", colour="Discretized Variable") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+
+### c  Orientation Angle
+ggplot(olive, aes(x=palmitic, y=oleic)) + geom_point()  +
+  geom_spoke(aes(angle = as.numeric(X_cut)), radius = 50) +
+  labs(x="Palmitic", y="Oleic", colour="Discretized Variable") +
+  theme_classic() + ggtitle("Palmitic VS Oleic")
+
+
+```
+
+Second plot is the hardest plot to analyze since only 4-5 levels can be percieved(2.2 bits) which is less compared to that of colour hue(3.1 bits) and line orientation(3 bits). Also, the data points overlap each other heavily and the data points of the third variable cannot be catogorized visually. First plot is the easiest of all to analyze since we can percieve 8 levels in colour hue(3 bits) and the hue is fairly distinct. 
+
+```{r}
+
+## 3 Oleic vs Eicosenoic
+ggplot(olive, aes(x=oleic, y=eicosenoic,col=Region)) + geom_point()  +
+  labs(x="Oleic", y="Eicosenoic", colour="Region") +
+  theme_classic() + ggtitle("Oleic VS Eicosenoic")
+
+Region_categorical <- as.factor(olive$Region)
+ggplot(olive, aes(x=oleic, y=eicosenoic,col=Region_categorical)) + geom_point()  +
+  labs(x="Oleic", y="Eicosenoic", colour="Region CV") +
+  theme_classic() + ggtitle("Oleic VS Eicosenoic")
+
+
+```
+
+In the first plot since region is a catogorical variable i.e. discrete, using this type of colouring is not advisable(differing brightness) because when there are larger number of regions it would make catogorizing regions visually with respect to region hard. This type of colouring can only be used for continuous variables.
+It is easier to catogorize visually with respect to region in the second plot due to preattentive mechanism.
+
+```{r}
+
+## 4 Oleic vs Eicosenoic
+Color_linoleic <- cut_interval(x=olive$linoleic, n = 3)
+shape_palmitic <- cut_interval(x=olive$palmitic, n = 3)
+size_palmitoleic <- cut_interval(x=olive$palmitoleic, n = 3)
+
+ggplot(olive, aes(x=oleic, y=eicosenoic,col=Color_linoleic)) +
+  geom_point(shape = shape_palmitic,size=size_palmitoleic)  +
+  labs(x="Oleic", y="Eicosenoic", colour="Color_linoleic") +
+  theme_classic() + ggtitle("Oleic VS Eicosenoic")
+
+```
+
+It is quite difficult to analize this type of plot since many variables are plotted using different metrics. It is also difficult to analyze since visual analysis does not become any easier  by combining different metrics, in this case 3*3 i.e. 27 and preattentive mechanism does not make sense. The channel capacities does not sum up in this case.
+
+```{r}
+
+## 5 Oleic vs Eicosenoic
+ggplot(olive, aes(x=oleic, y=eicosenoic,col=Region)) +
+  geom_point(shape = shape_palmitic,size=size_palmitoleic)  +
+  labs(x="Oleic", y="Eicosenoic", colour="Classes") +
+  theme_classic() + ggtitle("Oleic VS Eicosenoic")
+
+```
+
+It is possible to clearly see a decision boundary between Regions despite using many aesthetics because only 3 regions exist and the colours are distinct due to this. The peattentive mechanism comes into picture as well. This figure is processed in parallel by checking colour, shape (and size to a little extent) individually which acts as individual feature maps. Specific preattentive task is performed on each of these feature maps which aids in quicker and easier visual analysis.
+
+```{r}
+## 6
+library(dplyr)
+library(plotly)
+PP<- plot_ly(olive, labels = ~Area, values = ~oleic, type = 'pie') %>%
+                          layout(showlegend = FALSE)
+PP
+```
+
+Since lables are removed, the name of a particular area will only be visible when the cursor is hovered on that particular area on the pie chart and other area names will not be visible. 
+
+```{r}
+
+## 7 Linoleic vs Eicosenoic 
+ggplot(olive, aes(x=linoleic, y=eicosenoic) ) +
+  geom_density_2d() +
+  labs(x="Linoleic", y="Eicosenoic") +
+  theme_classic() + ggtitle("Linoleic vs Eicosenoic Contour Plot")
+  
+ggplot(olive, aes(x=linoleic, y=eicosenoic)) +
+  geom_point()  +
+  labs(x="Linoleic", y="Eicosenoic", colour="Classes") +
+  theme_classic() + ggtitle("Linoleic vs Eicosenoic Scatter Plot")
+
+```
+
+This contour plot can be misleading since the data points are not discrete or distinct. In addition the colour scale does not make the visual analysis any easier.
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(xlsx)
+library(MASS)
+library(plotly)
+library(ggpubr)
+
+## 1
+baseball <- read.xlsx("baseball-2016.xlsx", sheetIndex = 1)
+baseball.df <- as.data.frame(baseball)
+
+baseball.numeric <- scale(baseball[,sapply(baseball,is.numeric)])
+dist_baseball <- dist(baseball.numeric,"minkowski")
+
+```
+
+The numeric variables in the dataset baseball have different scales. When we analyze 
+the numeric data in terms of their mean and variance they differ too much so it
+is necessary to scale the numeric varibles to perform Multi dimensional scalling to get proper plot.
+
+```{r}
+## 2 Non MDS
+BB_val <- isoMDS(dist_baseball, k=2, p=2)
+BB_val_df <- data.frame(BB_val)
+coords <- BB_val$points
+
+NOMSD_plot <- ggplot(BB_val_df, aes(x=BB_val$points[,1], y=BB_val$points[,2])) + geom_point(aes(colour = baseball$League)) 
+ggplotly(NOMSD_plot)
+
+X <- BB_val$points[,1]
+Y <- BB_val$points[,2]
+
+plot_ly(type = "scatter",data = BB_val_df,x=~X, y=~Y ,text=baseball$Team,
+        mode = "markers",color = ~baseball$League)
+
+```
+
+The AL league is more concentrated in the center whereas NL is more scattered away from the axis.
+The Y component seems to provide best differentiation between leagues as it can be seen from the graph that more NL points lie on negative Y than AL points.BOSTON RED SOX and ATLANTA BRAVES seems to be the outliers.
+
+```{r}
+sh <- Shepard(dist_baseball, coords)
+delta <-as.numeric(dist_baseball)
+D <- as.numeric(dist(coords))
+
+n = nrow(coords)
+index = matrix(1:n, nrow=n, ncol=n)
+index1 = as.numeric(index[lower.tri(index)])
+
+n = nrow(coords)
+index = matrix(1:n, nrow=n, ncol=n, byrow = TRUE)
+index2 = as.numeric(index[lower.tri(index)])
+
+row.names(baseball) <- baseball[,1]
+
+sh_p <- plot_ly()%>%
+  add_markers(x=~delta, y=~D, hoverinfo = 'text',
+              text = ~paste('Obj1: ', rownames(baseball)[index1],
+                            '<br> Obj 2: ', rownames(baseball)[index2]))%>%
+  add_lines(x=~sh$x, y=~sh$yf)
+sh_p
+```
+
+
+We think that it is a decent fit, plot converges with slight fluctuations there is a monotonic increase in the values but there lies some values that are away from others. Observation pairs Minnesota Twins vs Arizona Diamondbacks, Oakland Athletics VS Milwaukee Brewers were hard for MDS to map successfully.
+
+```{r}
+## 2.4
+
+sp_data <- cbind(baseball.numeric, coords[,2])
+colnames(sp_data)[27] <- "MDScomp"
+sp_data <- as.data.frame(sp_data)
+
+varMDS_Fun <- function(given_col){
+  ggplot(data=sp_data, aes(x=MDScomp, y=sp_data[,given_col])) + geom_point() +
+    labs(y=colnames(sp_data)[given_col], title=paste(colnames(sp_data)[given_col]))
+}
+
+varMDS_Fun(9)
+varMDS_Fun(10)
+```
+
+Home Run variable showed the strongest positive connection with MDS component Y and the Triples variable showed the strongest negetive connection with MDS component. By searching google we came to know that both variables Home Run and Triples are very important in baseball for scoring. 
+The variable Y is highly influenced by some variables related to the process of making runs.
